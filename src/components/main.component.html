@@ -1,0 +1,149 @@
+
+<!-- Overlays -->
+@if (viewState() === 'welcome') {
+    <app-welcome (onStart)="finishWelcome()"></app-welcome>
+}
+
+@if (viewState() === 'intro') {
+    <app-intro (onFinish)="finishIntro()"></app-intro>
+}
+
+<!-- Main Application -->
+<div class="flex h-screen w-full overflow-hidden bg-slate-950 text-slate-200 transition-opacity duration-1000"
+     [class.opacity-0]="viewState() !== 'app'">
+  
+  <!-- Sidebar (Hidden on mobile) -->
+  <div class="w-64 flex-shrink-0 hidden lg:block h-full border-r border-slate-800 bg-slate-900">
+    <app-sidebar></app-sidebar>
+  </div>
+
+  <!-- Chat / Content Area -->
+  <main class="flex-1 flex flex-col h-full relative">
+    
+    <!-- Top Bar -->
+    <header class="h-16 flex items-center justify-between px-6 bg-slate-900 border-b border-slate-800 flex-shrink-0 z-20">
+        
+        <!-- Left Side: Mobile Logo & Session Info -->
+        <div class="flex items-center gap-4">
+            <div class="lg:hidden flex items-center gap-2 font-bold">
+                <i class="fa-solid fa-robot text-cyan-500"></i> ROMA
+            </div>
+            
+            <div class="hidden md:flex flex-col">
+                 <span class="text-xs font-mono text-slate-500 tracking-wider">SESSION ID: {{ 1000 + (100 * 0.5) | number:'1.0-0' }}X-ALPHA</span>
+                 <div class="text-[10px] text-green-500 font-mono flex items-center gap-1">
+                   <div class="w-1.5 h-1.5 rounded-full bg-green-500 animate-pulse"></div> SYSTEMS ONLINE
+                </div>
+            </div>
+        </div>
+
+        <!-- Right Side: Profile -->
+        <div class="relative">
+             <button (click)="toggleProfileMenu()" 
+                     class="flex items-center gap-3 hover:bg-slate-800 p-2 rounded-lg transition-colors border border-transparent hover:border-slate-700">
+                <div class="text-right hidden sm:block">
+                    <div class="text-sm font-bold text-slate-200">{{ currentUser()?.fullName || 'Engineer' }}</div>
+                    <div class="text-xs text-slate-500">{{ currentUser()?.email || 'Guest' }}</div>
+                </div>
+                <div class="w-9 h-9 rounded-full bg-cyan-600 text-white flex items-center justify-center font-bold text-sm shadow-lg shadow-cyan-900/30">
+                    {{ currentUser()?.fullName?.charAt(0) || 'U' }}
+                </div>
+             </button>
+
+             <!-- Dropdown Menu -->
+             @if (showProfileMenu()) {
+                <div class="absolute right-0 top-full mt-2 w-64 bg-slate-900 border border-slate-700 rounded-xl shadow-2xl z-50 overflow-hidden animate-fade-in">
+                    <div class="p-4 border-b border-slate-800 bg-slate-900/50">
+                        <p class="text-xs text-slate-500 uppercase font-bold mb-1">User Profile</p>
+                        <p class="text-slate-200 font-medium truncate">{{ currentUser()?.fullName }}</p>
+                        <p class="text-slate-400 text-xs truncate">{{ currentUser()?.email }}</p>
+                    </div>
+                    
+                    <div class="p-4 border-b border-slate-800">
+                        <div class="flex items-center justify-between mb-1">
+                            <p class="text-xs text-slate-500 uppercase font-bold">Security</p>
+                            <button (click)="togglePasswordVisibility()" class="text-[10px] text-cyan-400 hover:text-cyan-300 uppercase font-bold tracking-wider cursor-pointer">
+                                {{ showPassword() ? 'HIDE' : 'SHOW' }}
+                            </button>
+                        </div>
+                        <div class="flex items-center justify-between text-sm text-slate-300">
+                            <span>Password</span>
+                            <span class="font-mono text-slate-500 tracking-widest">
+                                {{ showPassword() ? currentUser()?.password : '******' }}
+                            </span>
+                        </div>
+                    </div>
+
+                    <div class="p-2">
+                        <button (click)="logout()" class="w-full text-left px-4 py-2 text-sm text-red-400 hover:bg-red-950/30 hover:text-red-300 rounded-lg transition-colors flex items-center gap-2">
+                            <i class="fa-solid fa-right-from-bracket"></i> Sign Out
+                        </button>
+                    </div>
+                </div>
+             }
+             
+             <!-- Click Outside Handler Overlay -->
+             @if (showProfileMenu()) {
+                 <div class="fixed inset-0 z-40" (click)="toggleProfileMenu()"></div>
+             }
+        </div>
+    </header>
+
+    <!-- Scrollable Messages Area -->
+    <div #scrollContainer class="flex-1 overflow-y-auto p-4 md:p-8 scroll-smooth flex flex-col gap-8 pb-32">
+        
+        @for (msg of messages(); track msg.id) {
+            <!-- Components from chat flow -->
+            @if (msg.role === 'model') {
+                <app-roma-message [response]="msg.data!" (onUnlock)="handleSafetyUnlock()"></app-roma-message>
+            }
+
+            @if (msg.role === 'user') {
+                <div class="flex gap-4 max-w-4xl mx-auto w-full flex-row-reverse animate-fade-in">
+                    <div class="w-10 h-10 rounded-full bg-slate-700 flex items-center justify-center flex-shrink-0 mt-1">
+                        <i class="fa-solid fa-user text-slate-300"></i>
+                    </div>
+                    <div class="bg-slate-800 border border-slate-700 p-4 rounded-2xl rounded-tr-none shadow-sm text-sm text-slate-200 max-w-[80%]">
+                        @if (msg.image) {
+                            <div class="mb-3 rounded-lg overflow-hidden border border-slate-600">
+                                <img [src]="'data:image/jpeg;base64,'+msg.image" class="max-h-64 object-cover">
+                            </div>
+                        }
+                        <p class="whitespace-pre-wrap leading-relaxed">{{ msg.content }}</p>
+                    </div>
+                </div>
+            }
+
+            @if (msg.role === 'error') {
+                <div class="flex gap-4 max-w-4xl mx-auto w-full animate-fade-in">
+                    <div class="w-10 h-10 rounded-full bg-red-900/20 border border-red-800 flex items-center justify-center flex-shrink-0 mt-1">
+                        <i class="fa-solid fa-triangle-exclamation text-red-500"></i>
+                    </div>
+                    <div class="bg-red-950/30 border border-red-900/50 p-4 rounded-2xl rounded-tl-none text-sm text-red-200">
+                        <p class="font-bold">System Alert</p>
+                        <p>{{ msg.content }}</p>
+                    </div>
+                </div>
+            }
+        }
+
+        @if (isProcessing()) {
+            <div class="flex gap-4 max-w-4xl mx-auto w-full animate-fade-in">
+                <div class="w-10 h-10 rounded-full bg-cyan-900/20 flex items-center justify-center flex-shrink-0">
+                     <i class="fa-solid fa-circle-notch fa-spin text-cyan-500"></i>
+                </div>
+                <div class="flex items-center gap-2 text-slate-500 text-xs font-mono pt-3">
+                    <span class="animate-pulse">Analyzing telemetry...</span>
+                </div>
+            </div>
+        }
+        
+    </div>
+
+    <!-- Fixed Input Area -->
+    <div class="absolute bottom-0 left-0 right-0 z-30">
+         <app-log-input (onDiagnose)="handleUserMessage($event)"></app-log-input>
+    </div>
+
+  </main>
+</div>

@@ -1,0 +1,5 @@
+{
+  "name": "ROMA - Robotics Operations & Maintenance Assistant",
+  "description": "An AI-powered industrial robotics diagnostics tool. Analyze robot logs and images to identify root causes, generate ROS2 recovery code, and provide safety checklists.",
+  "requestFramePermissions": []
+}
