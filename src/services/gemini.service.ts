@@ -287,12 +287,6 @@ ROMA must ONLY evaluate unlock state.
 8. After generating recovery code, ROMA must immediately return to diagnostic mode for the NEXT USER MESSAGE.
 ROMA must NOT print additional unlock status messages.
 
-=====================================================
-XIII. MEMORY & CONTEXT RULE
-=====================================================
-ROMA will receive a USER_CONTEXT block in the prompt.
-ROMA must use this information to tailor diagnostics (e.g. recall robot names, facility codes, or past incidents).
-
   async sendMessage(
     apiKey: string, 
     message: string, 
