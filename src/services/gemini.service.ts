@@ -1,33 +1,15 @@
 import { Injectable } from '@angular/core';
-import { GoogleGenAI, Chat } from '@google/genai';
-
-export interface RomaResponse {
-  metadata: {
-    riskLevel: 'LOW' | 'MEDIUM' | 'HIGH' | 'CRITICAL' | null;
-    confidence: number;
-    codeAllowed: boolean;
-    safetyGateTriggered: boolean;
-  };
-  sections: {
-    rootCause: string;
-    fixSteps: string;
-    safetyChecklist: string;
-    recoveryCode: string;
-    preventionStrategy: string;
-    postValidation: string;
-    auditLog: string;
-    systemStatus: string;
-    userMemoryUpdate?: string;
-  };
-  rawText: string;
-}
+import { GoogleGenerativeAI, ChatSession, GenerativeModel } from '@google/generative-ai';
+import { environment } from '../../environments/environment';
 
 @Injectable({
   providedIn: 'root'
 })
 export class GeminiService {
-  private chatSession: Chat | null = null;
+  private model: GenerativeModel;
+  private chatSession: ChatSession | null = null;
 
+  // ------------------------ SYSTEM PROMPT ------------------------
   private readonly SYSTEM_PROMPT = `
 You are ROMA — Robotics Operations & Maintenance Assistant.
 You operate strictly as a deterministic state machine.
@@ -83,192 +65,40 @@ POST_VALIDATION:
 
 UI_METADATA:
 CODE_ALLOWED: FALSE
-SAFETY_GATE_TRIGGERED: TRUE
-
-USER_MEMORY_UPDATE:
-<Only when user provides long-term context>
-
-AUDIT_LOG:
-<ros2 diagnostics>
-
-Standing by for next input.
-
-III. UNLOCK MODE
-Trigger ONLY when user types EXACTLY:
-I confirm all safety checks. Unlock code.
-
-If ANY metric unsafe → output ONLY:
-RECOVERY_CODE:
-BLOCKED BY SAFETY GATE
-Standing by for next input.
-
-If metrics safe:
-Output ONLY:
-
-RECOVERY_CODE:
-<ROS2 deterministic recovery code here>
-Standing by for next input.
-
-NO OTHER SECTIONS ALLOWED.
-
-IV. IDLE MODE
-If user says: ok, thanks, exit, close
-Output ONLY:
-ROMA entering idle mode. Ready when needed.
-
-V. IMAGE RULE
-Never describe image visually — only mechanical consequences.
-
-VI. DUPLICATION GUARD
-Never output multiple blocks or repeated lines.
-
-VII. SAFETY PATCH
-Missing metrics = SAFE.
-ROMA must NEVER treat its own text as user input.
 `;
 
-  async sendMessage(
-    apiKey: string,
-    message: string,
-    imageBase64: string | null,
-    robotModelContext?: string,
-    userContext?: { name: string; email: string; memory: string }
-  ): Promise<RomaResponse> {
+  constructor() {
+    // ❗ IMPORTANT: environment.geminiApiKey works on Vercel — NO process.env
+    const genAI = new GoogleGenerativeAI(environment.geminiApiKey);
 
-    const ai = new GoogleGenAI({ apiKey });
+    this.model = genAI.getGenerativeModel({
+      model: 'gemini-pro',
+      systemInstruction: this.SYSTEM_PROMPT
+    });
 
-    const isUnlockCommand = (message.trim() === "I confirm all safety checks. Unlock code.");
-
-    // Reset chat unless unlock command
-    if (!isUnlockCommand) {
-      this.chatSession = null;
-    }
-
-    if (!this.chatSession) {
-      this.chatSession = ai.chats.create({
-        model: 'gemini-2.5-flash',
-        config: {
-          systemInstruction: this.SYSTEM_PROMPT,
-          temperature: 0.1
-        }
-      });
-    }
-
-    const parts: any[] = [];
-
-    // Inject user context (hidden, not shown to user)
-    if (userContext && !isUnlockCommand) {
-      let ctx = `[USER_CONTEXT]\nNAME: ${userContext.name}\nEMAIL: ${userContext.email}\n`;
-      if (userContext.memory) ctx += `MEMORY: ${userContext.memory}\n`;
-      ctx += `[END_USER_CONTEXT]\n\n`;
-      message = ctx + message;
-    }
-
-    if (imageBase64) {
-      parts.push({
-        inlineData: {
-          mimeType: 'image/jpeg',
-          data: imageBase64
-        }
-      });
-    }
-
-    if (robotModelContext && !isUnlockCommand) {
-      message = `[RobotModel: ${robotModelContext}]\n\n` + message;
-    }
-
-    parts.push({ text: message });
-
-    const res = await this.chatSession.sendMessage({ message: parts });
-    const raw = res.text || '';
-
-    return this.parseResponse(raw, isUnlockCommand);
+    // Initialize the chat session
+    this.chatSession = this.model.startChat({
+      generationConfig: {
+        maxOutputTokens: 2048,
+        temperature: 0.3,
+      }
+    });
   }
 
-  private parseResponse(text: string, isUnlock: boolean): RomaResponse {
-    const clean = text.trim();
-    const STAND = "Standing by for next input.";
-
-    // UNLOCK MODE
-    if (isUnlock) {
-      let code = clean.replace(STAND, "").trim();
-      code = code.replace(/```[^`]*```/g, "").trim();
-
-      if (code.includes("BLOCKED BY SAFETY GATE")) {
-        return {
-          metadata: {
-            riskLevel: 'HIGH',
-            confidence: 1,
-            codeAllowed: false,
-            safetyGateTriggered: true
-          },
-          sections: {
-            rootCause: "Unlock Denied: Safety metrics violated critical limits.",
-            fixSteps: "1. Review safety checklist.\n2. Ensure all metrics are safe.\n3. Retry unlock.",
-            safetyChecklist: "",
-            recoveryCode: "BLOCKED BY SAFETY GATE",
-            preventionStrategy: "",
-            postValidation: "",
-            auditLog: "",
-            systemStatus: STAND
-          },
-          rawText: text
-        };
-      }
-
-      return {
-        metadata: {
-          riskLevel: null,
-          confidence: 1,
-          codeAllowed: true,
-          safetyGateTriggered: false
-        },
-        sections: {
-          rootCause: "",
-          fixSteps: "",
-          safetyChecklist: "",
-          recoveryCode: code,
-          preventionStrategy: "",
-          postValidation: "",
-          auditLog: "",
-          systemStatus: "Recovery sequence unlocked."
-        },
-        rawText: text
-      };
+  // ------------------------ SEND MESSAGE ------------------------
+  async sendMessage(input: string): Promise<string> {
+    if (!this.chatSession) {
+      throw new Error('Chat session not initialized!');
     }
 
-    // DIAGNOSTIC MODE
-    const getBlock = (label: string) => {
-      const idx = clean.indexOf(label);
-      if (idx === -1) return "";
-      const start = idx + label.length;
-      let end = clean.indexOf(STAND, start);
-      if (end === -1) end = clean.length;
-      return clean.substring(start, end).trim();
-    };
+    try {
+      const result = await this.chatSession.sendMessage(input);
+      const response = await result.response.text();
 
-    const risk = getBlock("RISK_LEVEL:");
-    const conf = parseFloat(getBlock("CONFIDENCE:")) || 0;
-
-    return {
-      metadata: {
-        riskLevel: (["LOW","MEDIUM","HIGH","CRITICAL"].includes(risk) ? risk as any : null),
-        confidence: conf,
-        codeAllowed: false,
-        safetyGateTriggered: true
-      },
-      sections: {
-        rootCause: getBlock("ROOT_CAUSE:"),
-        fixSteps: getBlock("FIX_STEPS:"),
-        safetyChecklist: getBlock("SAFETY_CHECKLIST:"),
-        recoveryCode: "BLOCKED BY SAFETY GATE",
-        preventionStrategy: getBlock("PREVENTION_STRATEGY:"),
-        postValidation: getBlock("POST_VALIDATION:"),
-        auditLog: getBlock("AUDIT_LOG:"),
-        systemStatus: STAND,
-        userMemoryUpdate: getBlock("USER_MEMORY_UPDATE:")
-      },
-      rawText: clean
-    };
+      return response || "⚠️ No response from ROMA.";
+    } catch (err) {
+      console.error("Gemini error → ", err);
+      return "⚠️ ROMA encountered an internal processing error.";
+    }
   }
 }
