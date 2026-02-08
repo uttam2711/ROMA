@@ -1,16 +1,12 @@
 {
-  "name": "roma-robotics-operations-maintenance-assistant",
-  "version": "0.0.0",
+  "name": "roma",
+  "version": "1.0.0",
   "private": true,
-  "type": "module",
-
   "scripts": {
     "start": "node server.js",
     "build": "ng build --configuration production",
-    "dev": "ng serve",
-    "preview": "ng serve --configuration=production"
+    "dev": "ng serve"
   },
-
   "dependencies": {
     "@angular/animations": "^17.0.0",
     "@angular/common": "^17.0.0",
@@ -22,13 +18,11 @@
     "@angular/router": "^17.0.0",
     "@google/genai": "^1.39.0",
     "express": "^4.18.2",
-    "rxjs": "^7.8.2",
-    "tslib": "^2.3.0"
+    "rxjs": "^7.8.0"
   },
-
   "devDependencies": {
     "@angular/cli": "^17.0.0",
     "@angular/compiler-cli": "^17.0.0",
-    "typescript": "5.9"
+    "typescript": "^5.9.0"
   }
 }
