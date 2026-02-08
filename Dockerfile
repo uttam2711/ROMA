@@ -1,5 +1,5 @@
 # build stage
-FROM node:18 AS build
+FROM node:20 AS build
 WORKDIR /app
 
 # copy dependencies and install
@@ -13,7 +13,7 @@ COPY . .
 RUN npm run build
 
 # production stage
-FROM node:18 AS server
+FROM node:20 AS server
 WORKDIR /app
 
 # copy only necessary files
