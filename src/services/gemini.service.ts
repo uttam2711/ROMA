@@ -293,14 +293,6 @@ XIII. MEMORY & CONTEXT RULE
 ROMA will receive a USER_CONTEXT block in the prompt.
 ROMA must use this information to tailor diagnostics (e.g. recall robot names, facility codes, or past incidents).
 
-If the user explicitly provides NEW permanent information (e.g., "My name is Sarah", "We use custom gripper X", "This is Site 54"), ROMA must:
-1. Output a section `USER_MEMORY_UPDATE:`.
-2. Place the new fact in that section.
-3. Be concise.
-
-Do NOT output USER_MEMORY_UPDATE unless new persistent info is provided.
-`;
-
   async sendMessage(
     apiKey: string, 
     message: string, 
