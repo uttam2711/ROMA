@@ -4,11 +4,11 @@ const path = require("path");
 const app = express();
 const PORT = process.env.PORT || 8080;
 
-// Serve Angular dist folder
-app.use(express.static(path.join(__dirname, "dist/roma/browser")));
+// Serve the Angular dist folder (flat structure)
+app.use(express.static(path.join(__dirname, "dist")));
 
 app.get("*", (req, res) => {
-  res.sendFile(path.join(__dirname, "dist/roma/browser/index.html"));
+  res.sendFile(path.join(__dirname, "dist/index.html"));
 });
 
 app.listen(PORT, () => {
